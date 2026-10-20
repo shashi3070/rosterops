@@ -1,0 +1,143 @@
+# rosterops example configuration — ILLUSTRATIVE ONLY.
+#
+# This profile shows the shape of a generic pharma field organization. It is
+# NOT an industry standard: every company defines headcount, leave, coverage,
+# and vacancy policy differently. Copy and adapt per organization.
+#
+# Validate with:
+#   rosterops validate-inputs --config examples/config/generic_pharma.yaml
+
+version: 1
+
+meta:
+  allow_unknown_fields: false
+
+data:
+  # Declared input grain (decision D1): one baseline row per employee-territory.
+  # Alternatives: employee | employee_territory | employee_territory_assignment | custom
+  grain: employee_territory
+
+dates:
+  interval_convention: half_open
+  baseline_includes_effective_date: true
+  default_date_format: "%Y-%m-%d"
+  termination_date_semantics: last_working_day_inclusive
+
+policies:
+  allow_multiple_active_territories: true
+  max_primary_territories_per_employee: 1
+  require_active_manager: true
+  allow_unassigned_active_employees: true
+
+  leave:
+    retains_employment_status: true
+    retains_home_assignment: true
+    coverage_required_by_default: false
+    allow_overlapping_leave_types: false
+
+  vacancy:
+    derive_only_for_required_owner_territories: true
+    count_leave_as_vacancy: false
+
+  events:
+    reject_events_on_or_before_baseline_date: true
+    # false, or an explicit policy name (e.g. effective_then_source).
+    resolve_conflicting_same_date_events: false
+
+# Auditable per-rule decisions: enable/disable, severity, parameters.
+rules:
+  - id: TRF-002
+    enabled: true
+    severity: error
+
+  - id: LOA-007
+    enabled: true
+    severity: warning
+    params:
+      coverage_required: false
+
+  - id: TER-005
+    enabled: true
+    severity: warning
+    params:
+      grace_days: 0
+
+# Source-to-canonical mappings per input role. Omitted roles are skipped
+# (unless a role marked required: true has no usable path at run time).
+inputs:
+  baseline:
+    path: inputs/main_roster.xlsx
+    format: excel
+    sheet_name: Roster
+    header_row: 0
+    required: true
+    columns:
+      employee_id: Employee Number
+      employee_status: Employee Status
+      role_code: Job Role
+      manager_id: Supervisor ID
+      territory_id: Home Territory
+      assignment_type: Assignment Type
+      is_primary: Primary Flag
+      effective_from: Assignment Start
+      effective_to: Assignment End
+
+  transfers:
+    required: false
+    path: inputs/transfers.xlsx
+    format: excel
+    sheet_name: Transfers
+    columns:
+      event_id: Transfer ID
+      employee_id: Employee Number
+      effective_date: Effective Date
+      from_territory_id: Old Territory
+      to_territory_id: New Territory
+
+  promotions:
+    required: false
+    path: inputs/promotions.xlsx
+    format: excel
+    columns:
+      event_id: Event ID
+      employee_id: Employee Number
+      effective_date: Promotion Date
+      old_role_code: Current Role
+      new_role_code: New Role
+
+  terminations:
+    required: false
+    path: inputs/terminations.xlsx
+    format: excel
+    columns:
+      event_id: Termination ID
+      employee_id: Employee Number
+      effective_date: Last Working Date
+
+  leaves:
+    required: false
+    path: inputs/leave.xlsx
+    format: excel
+    columns:
+      event_id: Leave ID
+      employee_id: Employee Number
+      leave_start_date: Leave Start
+      leave_end_date: Expected Return Date
+
+  territories:
+    required: false
+    path: inputs/territories.csv
+    format: csv
+    columns:
+      territory_id: Territory
+      territory_name: Territory Name
+      region_id: Region
+      district_id: District
+      territory_status: Status
+      requires_primary_owner: Requires Owner
+      max_assignees: Max Assignees
+
+outputs:
+  formats: [csv, parquet, json]
+  excel_row_cap: 50000
+  fail_on_warning: false

@@ -13,8 +13,8 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 | Phase | Title | Status | Started | Completed | Notes |
 |------:|-------|--------|---------|-----------|-------|
-| 0 | Repository bootstrap | NOT STARTED | | | |
-| 1 | Domain model, config, grain framework | NOT STARTED | | | |
+| 0 | Repository bootstrap | DONE | 2026-10-20 | 2026-10-20 | Tooling + CI green locally |
+| 1 | Domain model, config, grain framework | DONE | 2026-10-20 | 2026-10-20 | All 86 rule specs registered |
 | 2 | Input ingestion | NOT STARTED | | | |
 | 3 | Canonical event model | NOT STARTED | | | |
 | 4 | Snapshot validation (Mode B) | NOT STARTED | | | |
@@ -24,9 +24,13 @@ acceptance evidence exists (tests executed, commands run, output produced).
 | 8 | Testing, hardening, performance | NOT STARTED | | | |
 | 9 | Packaging, documentation, release readiness | NOT STARTED | | | |
 
-**Overall:** planning docs created; implementation not started.
+**Overall:** Phases 0–1 complete (package skeleton, shared contracts, all 86
+rule specifications). Quality gates green: `ruff check`/`format --check` clean,
+`mypy src` clean (24 files), `pytest` 112 passed, `python -m build` produces
+wheel + sdist. Ingestion onward not started.
 
-**Rules status:** implemented 0 / 86 spec'd; backlogged 0; see §3.
+**Rules status:** 86 / 86 spec'd and registered in the code registry; 0
+*runtime implementations* (rule logic lands with Phases 2–6); see §3.
 
 ---
 
@@ -56,12 +60,12 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 - [x] Folder `rosterops/` created; `REQUIREMENTS.md`, `IMPLEMENTATION_PHASES.md`, `.gitignore`
 - [x] Git repository initialized; initial commit of planning docs
-- [ ] `pyproject.toml` (PEP 621, src layout, deps `polars`/`pydantic`/`pyyaml`, extras `[excel]`/`[dev]`, entry point `rosterops = rosterops.cli:main`)
-- [ ] `src/rosterops/` skeleton with `__init__.py`, `__main__.py`, `exceptions.py`
-- [ ] Tooling configured: `ruff` (lint+format), `mypy` (strict on `src/`), `pytest` + `pytest-cov`, `hypothesis`
-- [ ] `tests/` tree (`unit/`, `integration/`, `rules/`, `property/`, `fixtures/`)
-- [ ] CI workflow `.github/workflows/ci.yml` (matrix 3.10–3.13: lint, typecheck, test, build)
-- [ ] `README.md` stub, `LICENSE` (MIT), `CHANGELOG.md` (Keep a Changelog), `SECURITY.md`, `CONTRIBUTING.md`
+- [x] `pyproject.toml` (PEP 621, src layout, deps `polars`/`pydantic`/`pyyaml`, extras `[excel]`/`[dev]`, entry point `rosterops = rosterops.cli:main`)
+- [x] `src/rosterops/` skeleton with `__init__.py`, `__main__.py`, `exceptions.py`
+- [x] Tooling configured: `ruff` (lint+format), `mypy` (strict on `src/`), `pytest` + `pytest-cov`, `hypothesis`
+- [x] `tests/` tree (`unit/`, `integration/`, `rules/`, `property/`, `fixtures/`)
+- [x] CI workflow `.github/workflows/ci.yml` (matrix 3.10–3.13: lint, typecheck, test, build)
+- [x] `README.md` stub, `LICENSE` (MIT), `CHANGELOG.md` (Keep a Changelog), `SECURITY.md`, `CONTRIBUTING.md`
 
 **Acceptance criteria:**
 
@@ -82,16 +86,16 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 **Deliverables:**
 
-- [ ] Canonical schemas: employee, territory, assignment, event, leave interval, coverage record (typed; Polars schema constants + pydantic models where row-level validation is needed)
-- [ ] `RosterConfig` with strict pydantic validation: `version`, `data.grain` (+ `grain_keys` for `custom`), `dates`, `policies` (incl. `leave`, `vacancy`, `events`), `rules` (id/enabled/severity/params), `inputs` (per-role mapping blocks), `outputs`, `meta.allow_unknown_fields`
-- [ ] Config precedence: defaults < file < CLI overrides; resolved-config echo (for `run_metadata.json`)
-- [ ] Grain framework: grain enum (`employee`, `employee_territory`, `employee_territory_assignment`, `custom`), grain-key resolution, GRN rule hooks
-- [ ] Interval module: half-open `[from, to)` helpers, overlap/adjacency/gap primitives (sorted sweep), inclusive→exclusive end normalization
-- [ ] Termination-date conversion for all three `termination_date_semantics` modes
-- [ ] Exception hierarchy: `RosterOpsError` → `ConfigError`, `InputError`, `ReconstructionError`
-- [ ] Rule contract (`rules/base.py`): RuleSpec (id, description, default severity, modes, params), Finding model (all §11.1 issue fields), deterministic ordering, registry with enable/severity overrides
-- [ ] Example config `examples/config/generic_pharma.yaml` labeled illustrative
-- [ ] Unit tests: config validation (unknown fields, bad severity, bad param types, rule id unknown), grain resolution, interval primitives, termination conversion (all 3 modes), rule registry/overrides
+- [x] Canonical schemas: employee, territory, assignment, event, leave interval, coverage record (typed; Polars schema constants + pydantic models where row-level validation is needed)
+- [x] `RosterConfig` with strict pydantic validation: `version`, `data.grain` (+ `grain_keys` for `custom`), `dates`, `policies` (incl. `leave`, `vacancy`, `events`), `rules` (id/enabled/severity/params), `inputs` (per-role mapping blocks), `outputs`, `meta.allow_unknown_fields`
+- [x] Config precedence: defaults < file < CLI overrides; resolved-config echo (for `run_metadata.json`)
+- [x] Grain framework: grain enum (`employee`, `employee_territory`, `employee_territory_assignment`, `custom`), grain-key resolution, GRN rule hooks
+- [x] Interval module: half-open `[from, to)` helpers, overlap/adjacency/gap primitives (sorted sweep), inclusive→exclusive end normalization
+- [x] Termination-date conversion for all three `termination_date_semantics` modes
+- [x] Exception hierarchy: `RosterOpsError` → `ConfigError`, `InputError`, `ReconstructionError`
+- [x] Rule contract (`rules/base.py`): RuleSpec (id, description, default severity, modes, params), Finding model (all §11.1 issue fields), deterministic ordering, registry with enable/severity overrides
+- [x] Example config `examples/config/generic_pharma.yaml` labeled illustrative
+- [x] Unit tests: config validation (unknown fields, bad severity, bad param types, rule id unknown), grain resolution, interval primitives, termination conversion (all 3 modes), rule registry/overrides
 
 **Acceptance criteria:**
 
@@ -336,23 +340,26 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 ## 3. Rule implementation tracking (target phase → status)
 
-Target phase is where the rule's positive/negative tests must land.
+Target phase is where the rule's positive/negative tests must land. "Spec'd"
+means the RuleSpec (id, name, default severity, modes, params) is registered and
+conformance-checked against REQUIREMENTS §8; runtime rule logic lands in the
+target phase (tracked as "Implemented").
 
-| Group | Rules | Target phase | Implemented | Tested |
-|-------|-------|--------------|-------------|--------|
-| A — Input/schema (8) | ING-001..003, SCH-001..005 | 2 | 0/8 | 0/8 |
-| B — Identifiers (7) | ID-001..007 | 2–3 | 0/7 | 0/7 |
-| C — Temporal (8) | DAT-001..008 | 4–5 | 0/8 | 0/8 |
-| D — Employment (8) | EMP-001..008 | 4–5 | 0/8 | 0/8 |
-| E — Transfers (9) | TRF-001..009 | 5–6 | 0/9 | 0/9 |
-| F — Promotions (6) | PRO-001..006 | 5–6 | 0/6 | 0/6 |
-| G — Leave (10) | LOA-001..010 | 5–6 | 0/10 | 0/10 |
-| H — Territory (9) | TER-001..009 | 4–6 | 0/9 | 0/9 |
-| I — Coverage (5) | COV-001..005 | 5–6 | 0/5 | 0/5 |
-| J — Hierarchy (5) | ORG-001..005 | 4 | 0/5 | 0/5 |
-| K — Reconciliation (8) | REC-001..008 | 6 | 0/8 | 0/8 |
-| L — Grain (3) | GRN-001..003 | 1/4 | 0/3 | 0/3 |
-| **Total** | **86** | | **0/86** | **0/86** |
+| Group | Rules | Target phase | Spec'd | Implemented | Tested |
+|-------|-------|--------------|--------|-------------|--------|
+| A — Input/schema (8) | ING-001..003, SCH-001..005 | 2 | 8/8 | 0/8 | 0/8 |
+| B — Identifiers (7) | ID-001..007 | 2–3 | 7/7 | 0/7 | 0/7 |
+| C — Temporal (8) | DAT-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
+| D — Employment (8) | EMP-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
+| E — Transfers (9) | TRF-001..009 | 5–6 | 9/9 | 0/9 | 0/9 |
+| F — Promotions (6) | PRO-001..006 | 5–6 | 6/6 | 0/6 | 0/6 |
+| G — Leave (10) | LOA-001..010 | 5–6 | 10/10 | 0/10 | 0/10 |
+| H — Territory (9) | TER-001..009 | 4–6 | 9/9 | 0/9 | 0/9 |
+| I — Coverage (5) | COV-001..005 | 5–6 | 5/5 | 0/5 | 0/5 |
+| J — Hierarchy (5) | ORG-001..005 | 4 | 5/5 | 0/5 | 0/5 |
+| K — Reconciliation (8) | REC-001..008 | 6 | 8/8 | 0/8 | 0/8 |
+| L — Grain (3) | GRN-001..003 | 1/4 | 3/3 | 0/3 | 0/3 |
+| **Total** | **86** | | **86/86** | **0/86** | **0/86** |
 
 ---
 
@@ -361,6 +368,14 @@ Target phase is where the rule's positive/negative tests must land.
 | Date | Command / check | Result |
 |------|-----------------|--------|
 | 2026-10-20 | `git init` + planning docs committed | PASS (initial commit) |
+| 2026-10-20 | `pip install -e ".[dev]"` | PASS (rosterops 0.1.0 editable installed; Python 3.11.3) |
+| 2026-10-20 | `ruff check .` / `ruff format --check .` | PASS (33 files formatted; 0 lint errors) |
+| 2026-10-20 | `mypy src` | PASS ("no issues found in 24 source files") |
+| 2026-10-20 | `pytest` | PASS (112 passed in ~1.0s) |
+| 2026-10-20 | `python -m build` | PASS (`rosterops-0.1.0.tar.gz` + `rosterops-0.1.0-py3-none-any.whl`) |
+| 2026-10-20 | `rosterops --version` / `python -m rosterops rules list` | PASS ("rosterops 0.1.0"; 86 rules) |
+| 2026-10-20 | `rosterops validate-inputs --config examples/config/generic_pharma.yaml` | PASS (configuration OK; grain employee_territory; 6 input roles; 3 rule overrides) |
+| 2026-10-20 | `rosterops process ...` (stub) | PASS (exits 2: "not implemented yet") |
 | | *(later phases append: pytest run IDs, coverage %, ruff/mypy outputs, build logs, benchmark numbers with machine details)* | |
 
 ---
