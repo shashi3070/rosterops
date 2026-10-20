@@ -26,7 +26,7 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 **Overall:** planning docs created; implementation not started.
 
-**Rules status:** implemented 0 / 84 spec'd; backlogged 0; see §3.
+**Rules status:** implemented 0 / 86 spec'd; backlogged 0; see §3.
 
 ---
 
@@ -232,10 +232,10 @@ acceptance evidence exists (tests executed, commands run, output produced).
 
 - §10 scenario metrics equal the expected table exactly — computed, not hard-coded (test asserts values against independently written expectations).
 - REC-001: `3 + 0 + 0 − 1 = 2` ✓; transfers/promotions/leave shown as headcount-neutral in the ledger tests.
-- Rule coverage report: 84 spec'd → implemented + tested, or listed in §5 Backlog with reason and target phase.
+- Rule coverage report: 86 spec'd → implemented + tested, or listed in §5 Backlog with reason and target phase.
 - Vacancy fixture asserts T100 and T300 vacant, T400 occupied, T200 not vacant (E002 on leave ≠ vacancy).
 
-**Exit gate:** `Implemented 84 (or backlog entries documented)` — no silent gaps.
+**Exit gate:** `Implemented 86 (or backlog entries documented)` — no silent gaps.
 
 ---
 
@@ -352,7 +352,7 @@ Target phase is where the rule's positive/negative tests must land.
 | J — Hierarchy (5) | ORG-001..005 | 4 | 0/5 | 0/5 |
 | K — Reconciliation (8) | REC-001..008 | 6 | 0/8 | 0/8 |
 | L — Grain (3) | GRN-001..003 | 1/4 | 0/3 | 0/3 |
-| **Total** | **84** | | **0/84** | **0/84** |
+| **Total** | **86** | | **0/86** | **0/86** |
 
 ---
 
@@ -394,7 +394,7 @@ Copied from REQUIREMENTS §19; each box requires evidence in §4.
 - [ ] Mode B single-file validation works; historical metrics `not_available`
 - [ ] Temporary coverage ≠ permanent transfer, enforced by tests
 - [ ] Date semantics unit-tested for every configured mode
-- [ ] All 84 rules implemented or backlogged with rationale (§5); zero advertised-but-missing
+- [ ] All 86 rules implemented or backlogged with rationale (§5); zero advertised-but-missing
 - [ ] §10 scenario: expected roster, counts, vacancies reproduced from data
 - [ ] 20-row invalid-variant matrix green (§8 in phases = table above)
 - [ ] CSV/Parquet/JSON tested; Excel tested with `[excel]`
