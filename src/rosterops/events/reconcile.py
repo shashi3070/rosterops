@@ -223,6 +223,13 @@ def detect_same_date_conflicts(
                     source_row=ledger.events[involved[0]].lineage.source_row,
                 )
             )
+        for idx in involved:
+            ev = ledger.events[idx]
+            if ev.status is EventStatus.ACTIVE:
+                ledger.events[idx] = ev.with_status(
+                    EventStatus.CONFLICTED,
+                    "conflicting same-date event blocked until resolved",
+                )
 
 
 def _conflicting_pairs(ledger: EventLedger, indices: list[int]) -> list[tuple[int, int]]:

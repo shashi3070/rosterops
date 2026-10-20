@@ -36,6 +36,8 @@ class EventStatus(str, Enum):
     DUPLICATE = "duplicate"
     OUT_OF_WINDOW = "out_of_window"
     INVALID = "invalid"
+    CONFLICTED = "conflicted"
+    BLOCKED = "blocked"
 
 
 @dataclass(frozen=True, slots=True)

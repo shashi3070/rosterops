@@ -426,7 +426,7 @@ def test_build_ledger_end_to_end_dedupes_windows_and_flags() -> None:
     assert any(f.rule_id == "DAT-007" for f in ledger.findings)
     # Baseline-dated termination is out of window -> DAT-006.
     assert any(f.rule_id == "DAT-006" for f in ledger.findings)
-    assert len(ledger.active_events()) == 2  # both transfers remain active
+    assert len(ledger.active_events()) == 0  # conflicts blocked
 
 
 def test_window_for_uses_config_baseline_semantics() -> None:
