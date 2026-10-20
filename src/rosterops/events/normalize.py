@@ -25,7 +25,7 @@ from rosterops.io.ingest import IngestedInput
 from rosterops.models import EventType, Lineage, TerminationDateSemantics
 from rosterops.rules.base import Finding
 from rosterops.rules.identifier_rules import ID_002
-from rosterops.rules.temporal_rules import DAT_001
+from rosterops.rules.temporal_rules import DAT_001, DAT_008
 
 __all__ = ["EVENT_ROLE_TYPES", "normalize_events", "segment_normalizers"]
 
@@ -102,14 +102,19 @@ def normalize_events(
         effective = _as_date(row.get(date_field))
         leave_start = _as_date(row.get("leave_start_date"))
         leave_end = _as_date(row.get("leave_end_date"))
+        old_value = _as_str(row.get("old_value"))
         if role == "coverage":
             # Coverage start is the effective date; record the covered territory.
             effective = _as_date(row.get("coverage_start_date"))
             leave_end = _as_date(row.get("coverage_end_date"))
+            old_value = _as_str(row.get("covered_employee_id")) or old_value
 
         end_exclusive: date | None = None
         if event_type is EventType.TERMINATION:
             end_exclusive = employment_exclusive_end(effective, termination_semantics)
+            _validate_termination_semantics(
+                ledger, row, effective, end_exclusive, lineage, event_id, employee_id
+            )
 
         event = Event(
             event_type=event_type,
@@ -117,7 +122,7 @@ def normalize_events(
             event_id=event_id,
             effective_date=effective,
             recorded_date=_as_date(row.get("recorded_date")),
-            old_value=_as_str(row.get("old_value")),
+            old_value=old_value,
             new_value=_as_str(row.get("new_value")),
             from_territory_id=_as_str(row.get("from_territory_id")),
             to_territory_id=_as_str(row.get("to_territory_id") or row.get("covered_territory_id")),
@@ -207,6 +212,41 @@ def _validate_identity(
                 )
             )
     return event
+
+
+def _validate_termination_semantics(
+    ledger: EventLedger,
+    row: dict[str, object],
+    stated: date | None,
+    converted: date | None,
+    lineage: Lineage,
+    event_id: str | None,
+    employee_id: str,
+) -> None:
+    """DAT-008: an explicit exclusive end in the source must agree with the conversion.
+
+    The canonical conversion is always applied; this fires only when the source
+    carries its own exclusive end that disagrees with the configured semantics,
+    which would mean conventions are being mixed silently.
+    """
+    explicit = _as_date(row.get("employment_end_exclusive") or row.get("employment_end_date"))
+    if explicit is None or converted is None or explicit == converted:
+        return
+    ledger.add_finding(
+        Finding.from_spec(
+            DAT_008,
+            f"termination for {employee_id!r} states exclusive end {explicit} but the "
+            f"configured convention converts {stated} to {converted}",
+            employee_id=employee_id or None,
+            event_id=event_id,
+            effective_date=stated,
+            source_file=lineage.source_file,
+            source_sheet=lineage.source_sheet,
+            source_row=lineage.source_row,
+            actual_value=explicit.isoformat(),
+            expected_value=converted.isoformat(),
+        )
+    )
 
 
 def _namespace_for(role: str) -> str:

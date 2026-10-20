@@ -24,7 +24,7 @@ import polars as pl
 from rosterops.config import InputRoleConfig
 from rosterops.domain.dates import DEFAULT_DATE_FORMATS, parse_date
 from rosterops.io.raw import RawTable
-from rosterops.models import REQUIRED_EVENT_FIELDS
+from rosterops.models import REQUIRED_EVENT_FIELDS, ROLE_FIELDS
 from rosterops.rules.base import Finding
 from rosterops.rules.identifier_rules import ID_005
 from rosterops.rules.input_rules import SCH_001, SCH_002, SCH_003, SCH_004, SCH_005
@@ -109,10 +109,15 @@ def map_to_canonical(
 
     null_tokens = tuple(cfg.null_tokens) if cfg.null_tokens is not None else DEFAULT_NULL_TOKENS
 
-    # 1) string pass: select + trim + null-token normalization.
+    # 1) string pass: select + trim + null-token normalization. Typed list
+    # columns are passed through untouched so their inner type is preserved.
     out = frame.select(
         [
-            pl.col(src).cast(pl.String, strict=False).alias(canonical)
+            (
+                pl.col(src).alias(canonical)
+                if canonical in _TYPED_LIST_FIELDS
+                else pl.col(src).cast(pl.String, strict=False).alias(canonical)
+            )
             for canonical, src in resolved.items()
         ]
     )
@@ -231,6 +236,15 @@ def _resolve_columns(
                 resolution[canonical] = actual
                 break
 
+    # Identity fallback: a source column already named like a canonical field
+    # of this role maps to itself (lowest priority, only fills gaps).
+    for canonical in ROLE_FIELDS.get(role, frozenset()):
+        if canonical in resolution:
+            continue
+        actual = canonical if canonical in source_columns else lowered.get(canonical.lower())
+        if actual is not None:
+            resolution[canonical] = actual
+
     # SCH-005: two source columns mapped to one canonical field.
     seen_targets: dict[str, str] = {}
     for canonical, source in list(resolution.items()):
@@ -254,13 +268,17 @@ def _resolve_columns(
 
 
 def _apply_trim(frame: pl.DataFrame) -> pl.DataFrame:
-    return frame.with_columns(
-        [pl.col(name).str.strip_chars().alias(name) for name in frame.columns]
-    )
+    string_cols = [name for name, dtype in frame.schema.items() if dtype == pl.String]
+    if not string_cols:
+        return frame
+    return frame.with_columns([pl.col(name).str.strip_chars().alias(name) for name in string_cols])
 
 
 def _apply_null_tokens(frame: pl.DataFrame, null_tokens: tuple[str, ...]) -> pl.DataFrame:
     if not null_tokens:
+        return frame
+    string_cols = [name for name, dtype in frame.schema.items() if dtype == pl.String]
+    if not string_cols:
         return frame
     return frame.with_columns(
         [
@@ -268,7 +286,7 @@ def _apply_null_tokens(frame: pl.DataFrame, null_tokens: tuple[str, ...]) -> pl.
             .then(pl.lit(None, dtype=pl.String))
             .otherwise(pl.col(name))
             .alias(name)
-            for name in frame.columns
+            for name in string_cols
         ]
     )
 

@@ -17,24 +17,32 @@ acceptance evidence exists (tests executed, commands run, output produced).
 | 1 | Domain model, config, grain framework | DONE | 2026-10-20 | 2026-10-20 | All 86 rule specs registered |
 | 2 | Input ingestion | DONE | 2026-10-20 | 2026-10-20 | csv/parquet/excel readers, mapping, lineage |
 | 3 | Canonical event model | DONE | 2026-10-20 | 2026-10-20 | 8 event types, ledger, dedupe, window, conflicts |
-| 4 | Snapshot validation (Mode B) | NOT STARTED | | | |
-| 5 | Event-driven reconstruction (Mode A) | NOT STARTED | | | |
-| 6 | Full rule catalogue, metrics, reconciliation | NOT STARTED | | | |
-| 7 | Reports and CLI | NOT STARTED | | | |
-| 8 | Testing, hardening, performance | NOT STARTED | | | |
+| 4 | Snapshot validation (Mode B) | DONE | 2026-10-20 | 2026-10-20 | Registry-driven snapshot pipeline, vacancies, metric availability |
+| 5 | Event-driven reconstruction (Mode A) | DONE | 2026-10-20 | 2026-10-20 | 8 event appliers, lifecycle findings, as-of state |
+| 6 | Full rule catalogue, metrics, reconciliation | DONE | 2026-10-20 | 2026-10-20 | Movement metrics, REC-001/002/003, per-rule counts |
+| 7 | Reports and CLI | DONE | 2026-10-20 | 2026-10-20 | `process`/`validate` wired, writers, console report |
+| 8 | Testing, hardening, performance | IN PROGRESS | | | Invalid-variant matrix, property tests, benchmarks pending |
 | 9 | Packaging, documentation, release readiness | NOT STARTED | | | |
 
-**Overall:** Phases 0–3 complete. Quality gates green: `ruff check`/`format
---check` clean, `mypy src` clean (36 files), `pytest` 182 passed / 1 skip,
+**Overall:** Phases 0–7 complete. Quality gates green: `ruff check`/`format
+--check` clean, `mypy src` clean (54 files), `pytest` 230 passed / 1 skip,
 `python -m build` produces wheel + sdist. Ingestion (csv/parquet/excel +
 canonical mapping + lineage) works end-to-end; all eight event types normalize
-into a canonical ledger with identity, dedupe, window cutoff, and conflict
-detection. Reconstruction onward not started.
+into a canonical ledger; Mode A reconstructs the §10 scenario end-to-end
+(transfer/promotion/leave/return/termination) with movement metrics,
+reconciliation, vacancies, lifecycle findings, and all output files; Mode B
+validates a snapshot and honestly reports movement metrics as `not_available`.
+CLI `process`/`validate` run end-to-end and write the §11.2 file set (incl. the
+Excel workbook with `[excel]`). Phase 8 hardening (invalid-variant matrix,
+property tests, benchmarks) and Phase 9 docs/release remain.
 
-**Rules status:** 86 / 86 spec'd; Group A (ING-*/SCH-*), ID-005, and the event
-identity/temporal rules implemented at the ingestion + event layers (ID-002,
-ID-007, DAT-001, DAT-006, DAT-007, DAT-008). Remaining lifecycle/state rules
-land with Phases 4–6.
+**Rules status:** 86 / 86 spec'd. Implemented across snapshot, state, and
+lifecycle layers: all of Groups A–L except the single backlogged rule `REC-008`
+(two-snapshot diff, depends on deferred `DEF-001`) — see §5. Post-reconstruction
+lifecycle coverage now includes `TRF-005/006/007/008`, `PRO-002/003/004/005`,
+`LOA-006/007/008/009/010`, `COV-003/004/005`, `DAT-005`, `DAT-008`, `TER-007`,
+`REC-004`, and `REC-006`. Positive/negative tests land in Phase 8 for the
+remaining matrix rows.
 
 ---
 

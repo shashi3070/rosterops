@@ -156,6 +156,116 @@ def test_duplicate_event_id_within_namespace_flags_id_002() -> None:
     assert id_002[0].event_id == "DUP"
 
 
+def test_duplicate_promotion_flags_pro_003_and_rec_006() -> None:
+    ledger = normalize_events(
+        _ingested(
+            "promotions",
+            [
+                {
+                    "event_id": "P-1",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 1, 1),
+                    "new_role_code": "SENIOR_REP",
+                },
+                {
+                    "event_id": "P-2",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 1, 1),
+                    "new_role_code": "SENIOR_REP",
+                },
+            ],
+        ),
+        termination_semantics=_LAST_WORKING,
+    )
+    dedupe_events(ledger)
+    assert any(f.rule_id == "PRO-003" for f in ledger.findings)
+    assert any(f.rule_id == "REC-006" for f in ledger.findings)
+
+
+def test_duplicate_transfer_flags_rec_006_not_pro_003() -> None:
+    ledger = normalize_events(
+        _ingested(
+            "transfers",
+            [
+                {
+                    "event_id": "T-1",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 1, 1),
+                    "to_territory_id": "T2",
+                },
+                {
+                    "event_id": "T-2",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 1, 1),
+                    "to_territory_id": "T2",
+                },
+            ],
+        ),
+        termination_semantics=_LAST_WORKING,
+    )
+    dedupe_events(ledger)
+    assert any(f.rule_id == "REC-006" for f in ledger.findings)
+    assert not any(f.rule_id == "PRO-003" for f in ledger.findings)
+
+
+def test_dat008_fires_when_explicit_end_disagrees() -> None:
+    ledger = normalize_events(
+        _ingested(
+            "terminations",
+            [
+                {
+                    "event_id": "X",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 3, 31),
+                    "employment_end_exclusive": date(2026, 3, 30),
+                }
+            ],
+        ),
+        termination_semantics=TerminationDateSemantics.LAST_WORKING_DAY_INCLUSIVE,
+    )
+    assert any(f.rule_id == "DAT-008" for f in ledger.findings)
+
+
+def test_dat008_silent_when_explicit_end_agrees() -> None:
+    ledger = normalize_events(
+        _ingested(
+            "terminations",
+            [
+                {
+                    "event_id": "X",
+                    "employee_id": "E1",
+                    "effective_date": date(2026, 3, 31),
+                    "employment_end_exclusive": date(2026, 4, 1),
+                }
+            ],
+        ),
+        termination_semantics=TerminationDateSemantics.LAST_WORKING_DAY_INCLUSIVE,
+    )
+    assert not any(f.rule_id == "DAT-008" for f in ledger.findings)
+
+
+def test_conflicting_transfer_emits_trf_006() -> None:
+    ledger = EventLedger(
+        events=[
+            _event(EventType.TRANSFER, employee_id="E1", to_territory_id="T2"),
+            _event(EventType.TRANSFER, employee_id="E1", to_territory_id="T3"),
+        ]
+    )
+    detect_same_date_conflicts(ledger, resolution_policy=None)
+    assert any(f.rule_id == "TRF-006" for f in ledger.findings)
+
+
+def test_termination_transfer_conflict_emits_trf_006() -> None:
+    ledger = EventLedger(
+        events=[
+            _event(EventType.TRANSFER, employee_id="E1", to_territory_id="T2"),
+            _event(EventType.TERMINATION, employee_id="E1"),
+        ]
+    )
+    detect_same_date_conflicts(ledger, resolution_policy=None)
+    assert any(f.rule_id == "TRF-006" for f in ledger.findings)
+
+
 def test_fingerprint_is_source_independent() -> None:
     a = build_fingerprint(EventType.TRANSFER, "E1", date(2026, 1, 1), to_territory_id="T2")
     b = build_fingerprint(EventType.TRANSFER, "E1", date(2026, 1, 1), to_territory_id="T2")

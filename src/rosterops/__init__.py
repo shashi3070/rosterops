@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from rosterops.config import RosterConfig
+from rosterops.engine import RosterResult
+from rosterops.engine.api import RosterEngine
 from rosterops.exceptions import ConfigError, InputError, ReconstructionError, RosterOpsError
 from rosterops.interop import is_pandas_dataframe, to_pandas, to_polars
 from rosterops.version import __version__
@@ -12,7 +14,9 @@ __all__ = [
     "InputError",
     "ReconstructionError",
     "RosterConfig",
+    "RosterEngine",
     "RosterOpsError",
+    "RosterResult",
     "__version__",
     "is_pandas_dataframe",
     "to_pandas",

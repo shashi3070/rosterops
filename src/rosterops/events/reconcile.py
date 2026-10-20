@@ -24,7 +24,10 @@ from rosterops.events.ledger import (
 from rosterops.models import EventType
 from rosterops.rules.base import Finding
 from rosterops.rules.identifier_rules import ID_007
+from rosterops.rules.promotion_rules import PRO_003
+from rosterops.rules.reconciliation_rules import REC_006
 from rosterops.rules.temporal_rules import DAT_006, DAT_007
+from rosterops.rules.transfer_rules import TRF_006
 
 __all__ = [
     "CONFLICT_RULES",
@@ -79,6 +82,42 @@ def dedupe_events(ledger: EventLedger) -> None:
                 expected_value=prior.fingerprint,
             )
         )
+        if event.event_type is EventType.PROMOTION:
+            ledger.add_finding(
+                Finding.from_spec(
+                    PRO_003,
+                    f"promotion for employee {event.employee_id!r} on "
+                    f"{_iso(event.effective_date)} is loaded more than once "
+                    f"(also in {prior.lineage.source_file}); duplicate is retained with a "
+                    f"finding, never silently dropped",
+                    employee_id=event.employee_id,
+                    event_id=event.event_id,
+                    effective_date=event.effective_date,
+                    source_file=event.lineage.source_file,
+                    source_row=event.lineage.source_row,
+                )
+            )
+        if event.event_type in {
+            EventType.TRANSFER,
+            EventType.PROMOTION,
+            EventType.TERMINATION,
+            EventType.HIRE,
+            EventType.REHIRE,
+        }:
+            ledger.add_finding(
+                Finding.from_spec(
+                    REC_006,
+                    f"duplicate {event.event_type.value} movement for employee "
+                    f"{event.employee_id!r} on {_iso(event.effective_date)} "
+                    f"(also in {prior.lineage.source_file}); duplicate is retained with a "
+                    f"finding, never silently dropped",
+                    employee_id=event.employee_id,
+                    event_id=event.event_id,
+                    effective_date=event.effective_date,
+                    source_file=event.lineage.source_file,
+                    source_row=event.lineage.source_row,
+                )
+            )
 
 
 def filter_to_window(ledger: EventLedger, window: ReconstructionWindow) -> None:
@@ -172,6 +211,18 @@ def detect_same_date_conflicts(
                 actual_value=",".join(types),
             )
         )
+        if any(ledger.events[i].event_type is EventType.TRANSFER for i in involved):
+            ledger.add_finding(
+                Finding.from_spec(
+                    TRF_006,
+                    f"conflicting transfers for employee {employee_id!r} on "
+                    f"{_iso(reference)}{policy_note}",
+                    employee_id=employee_id,
+                    effective_date=reference,
+                    source_file=ledger.events[involved[0]].lineage.source_file,
+                    source_row=ledger.events[involved[0]].lineage.source_row,
+                )
+            )
 
 
 def _conflicting_pairs(ledger: EventLedger, indices: list[int]) -> list[tuple[int, int]]:

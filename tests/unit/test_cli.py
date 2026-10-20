@@ -79,42 +79,140 @@ def test_rules_describe_unknown_rule_exits_2() -> None:
     assert "unknown rule id" in err
 
 
-def test_process_not_implemented_exits_2() -> None:
+def test_process_runs_and_writes_outputs(tmp_path: object) -> None:
+    root = tmp_path  # type: ignore[assignment]
+    inp = root / "in"  # type: ignore[operator]
+    inp.mkdir()
+    _write_scenario_csvs(inp)
+    cfg = _write_config(root)
+
+    code, out, _ = _run(
+        [
+            "process",
+            "--baseline",
+            str(inp / "baseline.csv"),
+            "--baseline-date",
+            "2026-09-30",
+            "--as-of",
+            "2026-10-31",
+            "--transfers",
+            str(inp / "transfers.csv"),
+            "--territories",
+            str(inp / "territories.csv"),
+            "--config",
+            str(cfg),
+            "--output-dir",
+            str(root / "out"),
+        ]
+    )
+    assert "mode: process" in out
+    assert "exit code:" in out
+    outdir = root / "out"  # type: ignore[operator]
+    assert (outdir / "final_roster.csv").exists()
+    assert (outdir / "run_metadata.json").exists()
+    assert code == 1  # scenario intentionally has a primary-owner clash (TER-003)
+
+
+def test_process_refuses_existing_output_dir(tmp_path: object) -> None:
+    root = tmp_path  # type: ignore[assignment]
+    inp = root / "in"  # type: ignore[operator]
+    inp.mkdir()
+    _write_scenario_csvs(inp)
+    cfg = _write_config(root)
+    outdir = root / "out"  # type: ignore[operator]
+    outdir.mkdir()
+    (outdir / "sentinel.txt").write_text("x", encoding="utf-8")
+
     code, _, err = _run(
         [
             "process",
             "--baseline",
-            "b.xlsx",
+            str(inp / "baseline.csv"),
             "--baseline-date",
             "2026-09-30",
             "--as-of",
             "2026-10-31",
             "--config",
-            "c.yaml",
+            str(cfg),
             "--output-dir",
-            "out",
+            str(outdir),
         ]
     )
     assert code == 2
-    assert "not implemented yet" in err
+    assert "already exists" in err
 
 
-def test_validate_not_implemented_exits_2() -> None:
-    code, _, err = _run(
+def test_validate_snapshot_runs(tmp_path: object) -> None:
+    root = tmp_path  # type: ignore[assignment]
+    inp = root / "in"  # type: ignore[operator]
+    inp.mkdir()
+    _write_scenario_csvs(inp)
+    cfg = _write_config(root)
+
+    code, out, _ = _run(
         [
             "validate",
             "--snapshot",
-            "s.xlsx",
+            str(inp / "baseline.csv"),
             "--as-of",
             "2026-10-31",
             "--config",
-            "c.yaml",
+            str(cfg),
             "--output-dir",
-            "out",
+            str(root / "out"),
         ]
     )
-    assert code == 2
-    assert "not implemented yet" in err
+    assert code in (0, 1)
+    assert "mode: snapshot" in out
+    assert "not_applicable" in out
+
+
+def _write_config(root: object):
+    cfg = root / "config.yaml"  # type: ignore[operator]
+    cfg.write_text("version: 1\ndata:\n  grain: employee_territory\n", encoding="utf-8")
+    return cfg
+
+
+def _write_scenario_csvs(inp: object) -> None:
+    import polars as pl
+
+    pl.DataFrame(
+        [
+            {
+                "employee_id": "E001",
+                "employee_status": "Active",
+                "role_code": "REP",
+                "territory_id": "T100",
+                "is_primary": True,
+                "employment_start_date": "2020-01-01",
+            },
+            {
+                "employee_id": "E002",
+                "employee_status": "Active",
+                "role_code": "REP",
+                "territory_id": "T200",
+                "is_primary": True,
+                "employment_start_date": "2020-01-01",
+            },
+        ]
+    ).write_csv(inp / "baseline.csv")  # type: ignore[operator]
+    pl.DataFrame(
+        [
+            {"territory_id": "T100", "requires_primary_owner": True},
+            {"territory_id": "T200", "requires_primary_owner": True},
+        ]
+    ).write_csv(inp / "territories.csv")  # type: ignore[operator]
+    pl.DataFrame(
+        [
+            {
+                "event_id": "TR001",
+                "employee_id": "E001",
+                "effective_date": "2026-10-01",
+                "from_territory_id": "T100",
+                "to_territory_id": "T200",
+            }
+        ]
+    ).write_csv(inp / "transfers.csv")  # type: ignore[operator]
 
 
 def test_validate_inputs_ok(example_config_path: object) -> None:

@@ -84,6 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate.add_argument("--snapshot", required=True, help="Consolidated roster file")
     validate.add_argument("--as-of", required=True, help="Effective date (YYYY-MM-DD)")
+    validate.add_argument("--territories", help="Territory master file")
     validate.add_argument("--config", required=True, help="Configuration YAML file")
     validate.add_argument("--output-dir", required=True, help="Directory for reports")
     validate.add_argument(
@@ -123,16 +124,111 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _rules_command(args)
     if args.command == "validate-inputs":
         return _validate_inputs_command(args)
-    if args.command in ("process", "validate"):
-        print(
-            f"the '{args.command}' command is not implemented yet "
-            "(planned in Phase 5/7 — see IMPLEMENTATION_PHASES.md); "
-            "exiting with code 2",
-            file=sys.stderr,
-        )
-        return 2
+    if args.command == "process":
+        return _process_command(args)
+    if args.command == "validate":
+        return _validate_command(args)
     parser.error(f"unknown command: {args.command}")
     return 2
+
+
+_EVENT_FLAGS = (
+    ("transfers", "transfers"),
+    ("promotions", "promotions"),
+    ("terminations", "terminations"),
+    ("leaves", "leaves"),
+    ("returns", "returns"),
+    ("hires", "hires"),
+    ("rehires", "rehires"),
+    ("coverage", "coverage"),
+)
+
+_MASTER_FLAGS = (("territories", "territories"), ("managers", "managers"))
+
+
+def _load_config(args: argparse.Namespace) -> RosterConfig | None:
+    try:
+        return RosterConfig.from_file(args.config)
+    except ConfigError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return None
+
+
+def _process_command(args: argparse.Namespace) -> int:
+    from rosterops.engine.api import RosterEngine
+    from rosterops.exceptions import RosterOpsError
+    from rosterops.outputs import console_report, write_outputs
+
+    config = _load_config(args)
+    if config is None:
+        return 2
+
+    sources: dict[str, str] = {"baseline": args.baseline}
+    for attr, role in (*_EVENT_FLAGS, *_MASTER_FLAGS):
+        value = getattr(args, attr, None)
+        if value:
+            sources[role] = value
+
+    try:
+        result = RosterEngine(config).process(
+            **sources,  # type: ignore[arg-type]
+            baseline_date=args.baseline_date,
+            as_of=args.as_of,
+        )
+    except RosterOpsError as exc:
+        print(f"run failed: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        report = write_outputs(
+            result,
+            args.output_dir,
+            input_paths=[p for p in sources.values() if isinstance(p, str)],
+            overwrite=args.overwrite,
+        )
+    except RosterOpsError as exc:
+        print(f"output error: {exc}", file=sys.stderr)
+        return 2
+
+    print(console_report(result, report))
+    return result.exit_code(fail_on_warning=args.fail_on_warning)
+
+
+def _validate_command(args: argparse.Namespace) -> int:
+    from rosterops.engine.api import RosterEngine
+    from rosterops.exceptions import RosterOpsError
+    from rosterops.outputs import console_report, write_outputs
+
+    config = _load_config(args)
+    if config is None:
+        return 2
+
+    sources: dict[str, str] = {"snapshot": args.snapshot}
+    if getattr(args, "territories", None):
+        sources["territories"] = args.territories
+
+    try:
+        result = RosterEngine(config).validate_snapshot(
+            **sources,  # type: ignore[arg-type]
+            as_of=args.as_of,
+        )
+    except RosterOpsError as exc:
+        print(f"run failed: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        report = write_outputs(
+            result,
+            args.output_dir,
+            input_paths=[p for p in sources.values() if isinstance(p, str)],
+            overwrite=args.overwrite,
+        )
+    except RosterOpsError as exc:
+        print(f"output error: {exc}", file=sys.stderr)
+        return 2
+
+    print(console_report(result, report))
+    return result.exit_code(fail_on_warning=args.fail_on_warning)
 
 
 def _rules_command(args: argparse.Namespace) -> int:
@@ -176,7 +272,6 @@ def _validate_inputs_command(args: argparse.Namespace) -> int:
     print(f"  grain:   {config.data.grain.value}")
     print(f"  inputs:  {len(config.inputs)} role(s) configured")
     print(f"  rules:   {len(config.rules)} override(s)")
-    print("  input-file checks: not yet active (ingestion arrives in Phase 2)")
     return 0
 
 
