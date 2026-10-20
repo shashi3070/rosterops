@@ -1,0 +1,50 @@
+
+def _apply_leave_start(ctx: EngineContext, event: Event, eid: str, known: set[str]) -> None:
+    start = event.leave_start_date or event.effective_date
+    if not eid or start is None:
+        ctx.emit(L.LOA_001, "leave event lacks a valid start date", event_id=event.event_id)
+        return
+    if eid not in known and not ctx.state.employment.get(eid):
+        ctx.emit(
+            L.LOA_002,
+            f"leave for {eid!r} references no known employment",
+            employee_id=eid,
+            event_id=event.event_id,
+        )
+        return
+    end = event.leave_end_date
+    end = event.leave_end_date
+    employment_start = _employment_start(ctx, eid)
+    if employment_start is not None and start < employment_start:
+        ctx.emit(
+            L.LOA_001,
+            f"leave for {eid!r} starts {start} before employment start {employment_start}",
+            employee_id=eid,
+            event_id=event.event_id,
+            effective_date=start,
+            actual_value=f"{start}",
+            expected_value=f">={employment_start}",
+        )
+    if end is not None and end < start:
+        ctx.emit(
+            L.LOA_001,
+            f"leave for {eid!r} ends {end} before it starts {start}",
+            employee_id=eid,
+            event_id=event.event_id,
+            actual_value=f"{start}..{end}",
+        )
+    for existing in ctx.state.leaves.get(eid, []):
+        if existing.start and intervals_overlap(start, end, existing.start, existing.end):
+            if not ctx.config.policies.leave.allow_overlapping_leave_types:
+                ctx.emit(
+                    L.LOA_003,
+                    f"overlapping leave for {eid!r}",
+                    employee_id=eid,
+                    event_id=event.event_id,
+                    effective_date=start,
+                )
+                break
+    ctx.state.add_leave(
+        LeaveInterval(employee_id=eid, start=start, end=end, source_event_id=event.event_id)
+    )
+

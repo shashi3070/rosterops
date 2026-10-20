@@ -318,8 +318,8 @@ def _apply_leave_start(ctx: EngineContext, event: Event, eid: str, known: set[st
         )
         return
     end = event.leave_end_date
-    end = event.leave_end_date
     employment_start = _employment_start(ctx, eid)
+    invalid = False
     if employment_start is not None and start < employment_start:
         ctx.emit(
             L.LOA_001,
@@ -330,6 +330,7 @@ def _apply_leave_start(ctx: EngineContext, event: Event, eid: str, known: set[st
             actual_value=f"{start}",
             expected_value=f">={employment_start}",
         )
+        invalid = True
     if end is not None and end < start:
         ctx.emit(
             L.LOA_001,
@@ -338,6 +339,9 @@ def _apply_leave_start(ctx: EngineContext, event: Event, eid: str, known: set[st
             event_id=event.event_id,
             actual_value=f"{start}..{end}",
         )
+        invalid = True
+    if invalid:
+        return
     for existing in ctx.state.leaves.get(eid, []):
         if existing.start and intervals_overlap(start, end, existing.start, existing.end):
             if not ctx.config.policies.leave.allow_overlapping_leave_types:
@@ -379,7 +383,8 @@ def _apply_leave_return(ctx: EngineContext, event: Event, eid: str, known: set[s
             effective_date=day,
         )
         return
-    index, leave = open_leaves[0]
+    # Prefer the most recent open leave (last started) to avoid closing the wrong interval
+    index, leave = max(open_leaves, key=lambda pair: pair[1].start or date.min)
     if day < (leave.start or day):
         ctx.emit(
             L.LOA_004,
@@ -428,6 +433,7 @@ def _apply_coverage(
             employee_id=covering,
             event_id=event.event_id,
         )
+        return
     ctx.state.add_coverage(
         CoverageRecord(
             covering_employee_id=covering,
