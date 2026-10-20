@@ -34,3 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Leading-zero identifier preservation (string keys end-to-end).
 - Optional pandas interop (`[pandas]` extra): `to_polars`/`to_pandas` without
   mutating caller frames (decision D11).
+- Canonical event ledger (`events/`): all eight event types normalized into a
+  single model with namespaced identity plus content fingerprints, cross-file
+  duplicate detection (`ID-007`), baseline-window cutoff (`DAT-006`), same-date
+  conflict detection with an explicit policy hook (`DAT-007`), and auditable
+  termination-date-semantics conversion (`DAT-008`). Excluded events are never
+  dropped — they retain a row with a status and finding.
+- `Lineage` value object shared by loaded and derived records.

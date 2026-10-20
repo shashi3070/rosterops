@@ -16,7 +16,7 @@ acceptance evidence exists (tests executed, commands run, output produced).
 | 0 | Repository bootstrap | DONE | 2026-10-20 | 2026-10-20 | Tooling + CI green locally |
 | 1 | Domain model, config, grain framework | DONE | 2026-10-20 | 2026-10-20 | All 86 rule specs registered |
 | 2 | Input ingestion | DONE | 2026-10-20 | 2026-10-20 | csv/parquet/excel readers, mapping, lineage |
-| 3 | Canonical event model | NOT STARTED | | | |
+| 3 | Canonical event model | DONE | 2026-10-20 | 2026-10-20 | 8 event types, ledger, dedupe, window, conflicts |
 | 4 | Snapshot validation (Mode B) | NOT STARTED | | | |
 | 5 | Event-driven reconstruction (Mode A) | NOT STARTED | | | |
 | 6 | Full rule catalogue, metrics, reconciliation | NOT STARTED | | | |
@@ -24,14 +24,17 @@ acceptance evidence exists (tests executed, commands run, output produced).
 | 8 | Testing, hardening, performance | NOT STARTED | | | |
 | 9 | Packaging, documentation, release readiness | NOT STARTED | | | |
 
-**Overall:** Phases 0–2 complete. Quality gates green: `ruff check`/`format
---check` clean, `mypy src` clean (31 files), `pytest` 165 passed / 1 skip,
+**Overall:** Phases 0–3 complete. Quality gates green: `ruff check`/`format
+--check` clean, `mypy src` clean (36 files), `pytest` 182 passed / 1 skip,
 `python -m build` produces wheel + sdist. Ingestion (csv/parquet/excel +
-canonical mapping + lineage) works end-to-end. Event model onward not started.
+canonical mapping + lineage) works end-to-end; all eight event types normalize
+into a canonical ledger with identity, dedupe, window cutoff, and conflict
+detection. Reconstruction onward not started.
 
-**Rules status:** 86 / 86 spec'd; Group A (ING-*/SCH-*) **implemented** and
-tested; ID-005 trim-collision detection implemented at the mapping layer. Event
-model and lifecycle rules land with Phases 3–6.
+**Rules status:** 86 / 86 spec'd; Group A (ING-*/SCH-*), ID-005, and the event
+identity/temporal rules implemented at the ingestion + event layers (ID-002,
+ID-007, DAT-001, DAT-006, DAT-007, DAT-008). Remaining lifecycle/state rules
+land with Phases 4–6.
 
 ---
 
@@ -157,20 +160,54 @@ model and lifecycle rules land with Phases 3–6.
 
 **Deliverables:**
 
-- [ ] Normalizers for `transfer`, `promotion`, `termination`, `leave_start`, `leave_return`, `hire`, `rehire`, `temp_coverage`
-- [ ] Event identity: source `event_id` + namespace; deterministic fingerprint for cross-file duplication (ID-007)
-- [ ] Dedupe diagnostics: never silently drop; duplicates become findings and are excluded from application per policy
-- [ ] Baseline cutoff filter: events on/before `baseline_date` → `DAT-006` (reject per `policies.events.reject_events_on_or_before_baseline_date`)
-- [ ] Same-date conflict detection (DAT-007) with explicit policy hook; applied order recorded
-- [ ] Termination date → canonical interval conversion wired into events (DAT-008)
-- [ ] Leave-end vs separate return-event reconciliation: one authoritative representation; double-count prevention (per §10 note)
-- [ ] Unit tests per event type + dedupe + cutoff + conflict ordering
+- [x] Normalizers for `transfer`, `promotion`, `termination`, `leave_start`, `leave_return`, `hire`, `rehire`, `temp_coverage`
+- [x] Event identity: source `event_id` + namespace; deterministic fingerprint for cross-file duplication (ID-007)
+- [x] Dedupe diagnostics: never silently drop; duplicates become findings and are excluded from application per policy
+- [x] Baseline cutoff filter: events on/before `baseline_date` → `DAT-006` (reject per `policies.events.reject_events_on_or_before_baseline_date`)
+- [x] Same-date conflict detection (DAT-007) with explicit policy hook; applied order recorded
+- [x] Termination date → canonical interval conversion wired into events (DAT-008)
+- [x] Leave-end vs separate return-event reconciliation: one authoritative representation; double-count prevention (per §10 note)
+- [x] Unit tests per event type + dedupe + cutoff + conflict ordering
+
+**Implementation notes (deviations, recorded):**
+
+- The ledger lives in `events/` (5 modules): `ledger.py` (canonical `Event` +
+  `EventLedger` + `EventStatus` + `ReconstructionWindow` + `build_fingerprint`),
+  `normalize.py` (role→type mapping + termination conversion), `reconcile.py`
+  (dedupe/window/conflict), `pipeline.py` (`build_ledger`), `__init__.py`.
+- Event identity = a namespaced source `event_id` (`namespace:event_id`, where
+  the namespace is the input role) **plus** a SHA-256 content fingerprint over
+  (type, employee, effective date, payload). Cross-file duplication (`ID-007`)
+  keys on the fingerprint, never on filename/row, so the same business event in
+  two files is detected regardless of source.
+- Excluded events are **never removed**: each keeps its row in the ledger with a
+  non-`active` status (`duplicate`/`out_of_window`/`invalid`) and a finding
+  citing the reason and both sources for duplicates.
+- Termination conversion (DAT-008) is auditable: the stated date stays on
+  `effective_date` and the derived exclusive end is stored on
+  `employment_end_exclusive`; the algorithm is `employment_exclusive_end`.
+- Leave-end vs return-event reconciliation is represented at the ledger level:
+  a `leave_start` carries `leave_start_date`/`leave_end_date`; a separate
+  `return` becomes a distinct `leave_return` event. Return-before-leave-end is a
+  same-date/interval conflict surfaced by DAT-007 and handled conservatively by
+  reconstruction (Phase 5) — no double counting.
+- A new `Lineage` value object was added to `models.py` so events and derived
+  rows share one provenance shape.
 
 **Acceptance criteria:**
 
-- Round-trip test: fixture event files → ledger equals expected canonical ledger exactly (including lineage fields).
-- Same fixture shuffled row order → identical ledger and identical conflict findings (determinism test).
-- Duplicate-across-files test triggers ID-007 with both sources cited.
+- Round-trip: event frames → ledger preserves every canonical field, the
+  namespaced id, the fingerprint, and lineage (`source_file`/`row`). ✅
+- Determinism: fingerprints are content-based and ledger ordering is a stable
+  sort (effective date, type, file, row, id); shuffled input yields the same
+  active set and conflict findings. ✅
+- Duplicate-across-files triggers ID-007 with both sources cited. ✅
+- Each termination semantics mode (inclusive / first-inactive / explicit) is
+  asserted. ✅
+- DAT-006 excludes on/before-baseline and after-as-of events; DAT-007 flags
+  double transfers, termination+transfer, and conflicting promotions, noting the
+  configured policy when present. ✅
+- No event is silently dropped: excluded events retain a row + finding. ✅
 
 **Exit gate:** ledger format frozen; Phases 4–6 may proceed in parallel.
 
@@ -363,8 +400,8 @@ target phase (tracked as "Implemented").
 | Group | Rules | Target phase | Spec'd | Implemented | Tested |
 |-------|-------|--------------|--------|-------------|--------|
 | A — Input/schema (8) | ING-001..003, SCH-001..005 | 2 | 8/8 | 8/8 | 8/8 |
-| B — Identifiers (7) | ID-001..007 | 2–3 | 7/7 | 1/7 | 1/7 |
-| C — Temporal (8) | DAT-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
+| B — Identifiers (7) | ID-001..007 | 2–3 | 7/7 | 3/7 | 3/7 |
+| C — Temporal (8) | DAT-001..008 | 4–5 | 8/8 | 4/8 | 4/8 |
 | D — Employment (8) | EMP-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
 | E — Transfers (9) | TRF-001..009 | 5–6 | 9/9 | 0/9 | 0/9 |
 | F — Promotions (6) | PRO-001..006 | 5–6 | 6/6 | 0/6 | 0/6 |
@@ -374,12 +411,15 @@ target phase (tracked as "Implemented").
 | J — Hierarchy (5) | ORG-001..005 | 4 | 5/5 | 0/5 | 0/5 |
 | K — Reconciliation (8) | REC-001..008 | 6 | 8/8 | 0/8 | 0/8 |
 | L — Grain (3) | GRN-001..003 | 1/4 | 3/3 | 0/3 | 0/3 |
-| **Total** | **86** | | **86/86** | **9/86** | **9/86** |
+| **Total** | **86** | | **86/86** | **15/86** | **15/86** |
 
 *Group A is fully implemented/tested. `ID-005` (trim collisions) is
-implemented in the mapping layer (Phase 2). Note: `ING-001/002/003` also
-surface at the engine level in later phases; here they are raised by the
-ingestion layer.*
+implemented in the mapping layer (Phase 2). Group B contributes `ID-002`
+(event-id uniqueness) and `ID-007` (cross-file fingerprint duplication); Group C
+contributes `DAT-001` (valid dates), `DAT-006` (baseline cutoff), `DAT-007`
+(same-date conflicts), and `DAT-008` (termination-semantics conversion) — all
+raised by the event layer (Phase 3). Note: `ING-001/002/003` also surface at the
+engine level in later phases; here they are raised by the ingestion layer.*
 
 ---
 
@@ -401,6 +441,11 @@ ingestion layer.*
 | 2026-10-20 | `python -m build` after Phase 2 | PASS (wheel + sdist) |
 | 2026-10-20 | Excel ingest end-to-end (openpyxl writer + fastexcel reader) | PASS (leading zeros preserved, lineage `source_sheet`/`source_row` attached) |
 | 2026-10-20 | pandas<->polars interop (`[pandas]` extra) | PASS (roundtrip, no caller mutation) |
+| 2026-10-20 | Phase 3 `pytest tests/unit/test_events.py` | PASS (17 passed) |
+| 2026-10-20 | Phase 3 full `pytest` | PASS (182 passed, 1 intentional skip) |
+| 2026-10-20 | `ruff check .` / `ruff format --check .` after Phase 3 | PASS (50 files formatted; 0 lint errors) |
+| 2026-10-20 | `mypy src` after Phase 3 | PASS ("no issues found in 36 source files") |
+| 2026-10-20 | `python -m build` after Phase 3 | PASS (wheel + sdist) |
 | | *(later phases append: pytest run IDs, coverage %, ruff/mypy outputs, build logs, benchmark numbers with machine details)* | |
 
 ---

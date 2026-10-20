@@ -9,6 +9,7 @@ reports. Column names here are canonical; source files map onto them through
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from enum import Enum
 from typing import TypeAlias
 
@@ -36,6 +37,7 @@ __all__ = [
     "EventType",
     "Grain",
     "InputMode",
+    "Lineage",
     "Severity",
     "TerminationDateSemantics",
     "grain_keys",
@@ -119,6 +121,28 @@ LINEAGE_FIELDS: dict[str, DtypeLike] = {
     "source_sheet": pl.String,
     "source_row": pl.Int64,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class Lineage:
+    """Provenance of a loaded or derived record (REQUIREMENTS §11.1)."""
+
+    source_file: str | None = None
+    source_sheet: str | None = None
+    source_row: int | None = None
+
+    @classmethod
+    def from_mapping(cls, row: object) -> Lineage:
+        """Build lineage from a mapping with ``source_*`` keys."""
+        get = getattr(row, "get", None)
+        if get is None:
+            return cls()
+        return cls(
+            source_file=get("source_file"),
+            source_sheet=get("source_sheet"),
+            source_row=get("source_row"),
+        )
+
 
 EMPLOYEE_FIELDS: dict[str, DtypeLike] = {
     "employee_id": pl.String,

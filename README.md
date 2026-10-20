@@ -15,7 +15,7 @@ historical events from a single snapshot.
 
 ## Status
 
-**Early development (Phases 0–2 complete).** Currently available:
+**Early development (Phases 0–3 complete).** Currently available:
 
 - Strict versioned configuration (`RosterConfig`) with grain, date, policy,
   input-mapping, and rule-override sections.
@@ -26,12 +26,17 @@ historical events from a single snapshot.
   readers with format detection, source→canonical column mapping, aliases, null
   tokens, per-field date formats, categorical checks, trim policy, and per-row
   lineage — Group A rules (`ING-*`, `SCH-*`) implemented.
+- **Canonical event ledger**: all eight event types (transfer, promotion,
+  termination, leave start/return, hire, rehire, temp coverage) normalized with
+  namespaced identity, content fingerprints (cross-file dedupe `ID-007`),
+  baseline cutoff (`DAT-006`), same-date conflict detection (`DAT-007`), and
+  auditable termination-semantics conversion (`DAT-008`).
 - Optional pandas interop (`[pandas]`): convert caller DataFrames to/from Polars.
 - CLI scaffold: `--version`, `rules list`, `rules describe`, `validate-inputs`
   (configuration check only).
 
-Not yet implemented: event normalization, reconstruction, full rule execution,
-metrics, reports, and the `process`/`validate` commands. See
+Not yet implemented: reconstruction, full rule execution, metrics, reports, and
+the `process`/`validate` commands. See
 [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) for the full tracker
 and [`REQUIREMENTS.md`](REQUIREMENTS.md) for the operative specification.
 
