@@ -32,8 +32,12 @@ dependencies = [
 
 [project.optional-dependencies]
 excel = [
-    "python-calamine>=0.3,<1.0",
+    "fastexcel>=0.10,<1.0",
     "openpyxl>=3.1,<4.0",
+]
+pandas = [
+    "pandas>=2.0,<3.0",
+    "pyarrow>=14.0",
 ]
 dev = [
     "pytest>=8.0",
@@ -71,6 +75,16 @@ strict = true
 files = ["src/rosterops"]
 warn_unused_ignores = true
 show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastexcel.*",
+    "calamine.*",
+    "python_calamine.*",
+    "pyarrow.*",
+    "pandas.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -64,7 +64,7 @@ These decisions were made during planning and bind the implementation:
 | # | Decision | Choice | Consequence |
 |---|----------|--------|-------------|
 | D1 | **Canonical roster grain** | **Configurable — no single canonical grain.** The engine operates at the grain declared in configuration (`data.grain`), validated against the actual data. | Duplicate, overlap, and cardinality rules are keyed to the declared grain (§5). A grain-validation rule group (GRN-*) enforces that data matches the declared grain. Headcount is always derived at employee level regardless of grain. |
-| D2 | **Excel support** | **Optional extra** `rosterops[excel]`: `python-calamine` for reads (Polars-native), `openpyxl` for Excel workbook writes. CSV and Parquet are always available. | Without the extra, Excel inputs fail with rule `ING-002` and an actionable install hint. Excel report generation is skipped with a documented reason. |
+| D2 | **Excel support** | **Optional extra** `rosterops[excel]`: `fastexcel` for reads (the binding Polars uses for its `calamine` engine), `openpyxl` for Excel workbook writes. CSV and Parquet are always available. | Without the extra, Excel inputs fail with rule `ING-002` and an actionable install hint. Excel report generation is skipped with a documented reason. |
 | D3 | **Python support** | **3.10+** (CI matrix 3.10–3.13). | Use `from __future__ import annotations` where useful; no 3.9 shims. |
 | D4 | **Repository** | Standalone git repository at `rosterops/`, sibling to other projects under `python_lib/`. | Own CI, changelog, and release history. |
 
@@ -78,6 +78,7 @@ Additional locked-in technical choices (revisitable only with rationale):
 | D8 | Core dependencies: `polars`, `pydantic>=2`, `pyyaml` | Everything else optional or dev-only. |
 | D9 | Date model: **date-only** for business dates; timestamps preserved with explicit timezone policy if a source supplies them | Pharma roster events are date-effective, not time-of-day effective. |
 | D10 | Interval convention: **half-open `[effective_from, effective_to)`**, end-nullable | Eliminates off-by-one overlap bugs; source inclusive ends normalized via config. |
+| D11 | **pandas interop is optional** (`rosterops[pandas]`): the API accepts `pandas.DataFrame` inputs and can return pandas frames on request; internals are Polars. | Users on pandas stacks get native ergonomics without making pandas a core dependency. Conversions happen only at the API boundary; conversions never mutate the caller's frame. |
 
 ---
 
@@ -316,7 +317,7 @@ conflicting promotions; return before leave end; rehire + termination) MUST:
 |--------|--------------|--------|
 | CSV | always | Polars (lazy scan preferred) |
 | Parquet | always | Polars |
-| XLSX/XLS | extra `[excel]` | `python-calamine` via Polars |
+| XLSX/XLS | extra `[excel]` | `fastexcel` via Polars (`engine="calamine"`) |
 | XLSX write (report) | extra `[excel]` | `openpyxl` |
 
 Unsupported extensions MUST fail with `ING-002` listing supported formats.
@@ -691,8 +692,12 @@ result = engine.validate_snapshot(pl.read_parquet("roster.parquet"), as_of=...)
 
 Requirements:
 
-- Accept file paths and (where schema-valid) Polars DataFrames; DataFrame
-  inputs skip file I/O but still run mapping/validation.
+- Accept file paths and (where schema-valid) Polars **or pandas** DataFrames;
+  DataFrame inputs skip file I/O but still run mapping/validation. pandas
+  support requires the optional `rosterops[pandas]` extra; without it, passing a
+  pandas frame raises `InputError` with an install hint.
+- Return Polars DataFrames by default; `to_pandas=True` (or a pandas-input run)
+  can request pandas outputs. Conversions never mutate the caller's frame.
 - Synchronous API; documented as such.
 - Typed results; `RosterOpsError` hierarchy: `ConfigError`, `InputError`,
   `ReconstructionError` — distinct from business validation findings.

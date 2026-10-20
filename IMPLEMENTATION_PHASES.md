@@ -15,7 +15,7 @@ acceptance evidence exists (tests executed, commands run, output produced).
 |------:|-------|--------|---------|-----------|-------|
 | 0 | Repository bootstrap | DONE | 2026-10-20 | 2026-10-20 | Tooling + CI green locally |
 | 1 | Domain model, config, grain framework | DONE | 2026-10-20 | 2026-10-20 | All 86 rule specs registered |
-| 2 | Input ingestion | NOT STARTED | | | |
+| 2 | Input ingestion | DONE | 2026-10-20 | 2026-10-20 | csv/parquet/excel readers, mapping, lineage |
 | 3 | Canonical event model | NOT STARTED | | | |
 | 4 | Snapshot validation (Mode B) | NOT STARTED | | | |
 | 5 | Event-driven reconstruction (Mode A) | NOT STARTED | | | |
@@ -24,13 +24,14 @@ acceptance evidence exists (tests executed, commands run, output produced).
 | 8 | Testing, hardening, performance | NOT STARTED | | | |
 | 9 | Packaging, documentation, release readiness | NOT STARTED | | | |
 
-**Overall:** Phases 0–1 complete (package skeleton, shared contracts, all 86
-rule specifications). Quality gates green: `ruff check`/`format --check` clean,
-`mypy src` clean (24 files), `pytest` 112 passed, `python -m build` produces
-wheel + sdist. Ingestion onward not started.
+**Overall:** Phases 0–2 complete. Quality gates green: `ruff check`/`format
+--check` clean, `mypy src` clean (31 files), `pytest` 165 passed / 1 skip,
+`python -m build` produces wheel + sdist. Ingestion (csv/parquet/excel +
+canonical mapping + lineage) works end-to-end. Event model onward not started.
 
-**Rules status:** 86 / 86 spec'd and registered in the code registry; 0
-*runtime implementations* (rule logic lands with Phases 2–6); see §3.
+**Rules status:** 86 / 86 spec'd; Group A (ING-*/SCH-*) **implemented** and
+tested; ID-005 trim-collision detection implemented at the mapping layer. Event
+model and lifecycle rules land with Phases 3–6.
 
 ---
 
@@ -115,21 +116,35 @@ wheel + sdist. Ingestion onward not started.
 
 **Deliverables:**
 
-- [ ] `io/csv_reader.py` (lazy scan preferred), `io/parquet_reader.py`, `io/excel_reader.py` (calamine; graceful `ING-002` install-hint when extra missing)
-- [ ] Format detection by extension; unsupported → `ING-002` listing supported formats
-- [ ] Missing/unreadable required file → `ING-001`; optional role absent → skipped with note
-- [ ] Excel: sheet existence → `ING-003`, empty workbook/sheet detection, header-row config, sheet selection (never assume first sheet)
-- [ ] `mapping/canonical.py`: source→canonical column mapping + aliases, null tokens, per-field date format lists, categorical normalization tables, trim policy
-- [ ] Lineage columns attached to every row (`source_file`, `source_sheet`, `source_row`); parse failures → findings, **no row silently dropped**
-- [ ] Leading-zero identifier preservation (string keys end-to-end; regression test with `007`, `00123`)
-- [ ] `SCH-001..005` raised from the mapping layer (SCH-005 ambiguity check before any load)
-- [ ] Unit tests: all readers, unreadable/malformed/empty inputs, missing sheet, bad date cell located by row, extra-column warning, alias resolution, null-token handling
+- [x] `io/csv_reader.py` (lazy scan preferred), `io/parquet_reader.py`, `io/excel_reader.py` (calamine; graceful `ING-002` install-hint when extra missing)
+- [x] Format detection by extension; unsupported → `ING-002` listing supported formats
+- [x] Missing/unreadable required file → `ING-001`; optional role absent → skipped with note
+- [x] Excel: sheet existence → `ING-003`, empty workbook/sheet detection, header-row config, sheet selection (never assume first sheet)
+- [x] `mapping/canonical.py`: source→canonical column mapping + aliases, null tokens, per-field date format lists, categorical normalization tables, trim policy
+- [x] Lineage columns attached to every row (`source_file`, `source_sheet`, `source_row`); parse failures → findings, **no row silently dropped**
+- [x] Leading-zero identifier preservation (string keys end-to-end; regression test with `007`, `00123`)
+- [x] `SCH-001..005` raised from the mapping layer (SCH-005 ambiguity check before any load)
+- [x] Unit tests: all readers, unreadable/malformed/empty inputs, missing sheet, bad date cell located by row, extra-column warning, alias resolution, null-token handling
+
+**Implementation notes (deviations, recorded):**
+
+- Readers are consolidated in `io/readers.py` (not three separate modules):
+  `read_raw` + `detect_format`; `io/raw.py` holds `RawTable`/`ReadError`;
+  `io/ingest.py` orchestrates read + map into `IngestedInput`.
+- **Excel read dependency changed from `python-calamine` to `fastexcel`** —
+  Polars 2.0's `read_excel(engine="calamine")` binds Rust Calamine via
+  `fastexcel`. REQUIREMENTS §2 D2 and §7.1 updated accordingly.
+- **pandas interop added (D11, optional `[pandas]` extra)**: `interop.py`
+  converts caller DataFrames to/from Polars without mutation; pandas is never a
+  core dependency. Engine-level DataFrame acceptance lands in Phase 7.
+- `ID-005` (whitespace/normalization collisions) is implemented here because it
+  is a property of the trim policy applied during mapping.
 
 **Acceptance criteria:**
 
-- Each test for ING-001/002/003, SCH-001/002/003/004/005 passes with file/sheet/row/column context asserted.
-- CSV and Parquet paths pass with only core deps installed; Excel tests skip cleanly without `[excel]` and pass with it.
-- No test observes a dropped row; parse-failure fixtures yield findings equal to failure-row count.
+- Each test for ING-001/002/003, SCH-001/002/003/004/005 passes with file/sheet/row/column context asserted. ✅
+- CSV and Parquet paths pass with only core deps installed; Excel tests skip cleanly without `[excel]` and pass with it. ✅
+- No test observes a dropped row; parse-failure fixtures yield findings equal to failure-row count. ✅
 
 **Exit gate:** ingestion contract stable; Phase 3 can consume canonical frames.
 
@@ -347,8 +362,8 @@ target phase (tracked as "Implemented").
 
 | Group | Rules | Target phase | Spec'd | Implemented | Tested |
 |-------|-------|--------------|--------|-------------|--------|
-| A — Input/schema (8) | ING-001..003, SCH-001..005 | 2 | 8/8 | 0/8 | 0/8 |
-| B — Identifiers (7) | ID-001..007 | 2–3 | 7/7 | 0/7 | 0/7 |
+| A — Input/schema (8) | ING-001..003, SCH-001..005 | 2 | 8/8 | 8/8 | 8/8 |
+| B — Identifiers (7) | ID-001..007 | 2–3 | 7/7 | 1/7 | 1/7 |
 | C — Temporal (8) | DAT-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
 | D — Employment (8) | EMP-001..008 | 4–5 | 8/8 | 0/8 | 0/8 |
 | E — Transfers (9) | TRF-001..009 | 5–6 | 9/9 | 0/9 | 0/9 |
@@ -359,7 +374,12 @@ target phase (tracked as "Implemented").
 | J — Hierarchy (5) | ORG-001..005 | 4 | 5/5 | 0/5 | 0/5 |
 | K — Reconciliation (8) | REC-001..008 | 6 | 8/8 | 0/8 | 0/8 |
 | L — Grain (3) | GRN-001..003 | 1/4 | 3/3 | 0/3 | 0/3 |
-| **Total** | **86** | | **86/86** | **0/86** | **0/86** |
+| **Total** | **86** | | **86/86** | **9/86** | **9/86** |
+
+*Group A is fully implemented/tested. `ID-005` (trim collisions) is
+implemented in the mapping layer (Phase 2). Note: `ING-001/002/003` also
+surface at the engine level in later phases; here they are raised by the
+ingestion layer.*
 
 ---
 
@@ -376,6 +396,11 @@ target phase (tracked as "Implemented").
 | 2026-10-20 | `rosterops --version` / `python -m rosterops rules list` | PASS ("rosterops 0.1.0"; 86 rules) |
 | 2026-10-20 | `rosterops validate-inputs --config examples/config/generic_pharma.yaml` | PASS (configuration OK; grain employee_territory; 6 input roles; 3 rule overrides) |
 | 2026-10-20 | `rosterops process ...` (stub) | PASS (exits 2: "not implemented yet") |
+| 2026-10-20 | Phase 2 `pytest` (readers + mapping + ingest + interop) | PASS (165 passed, 1 intentional skip) |
+| 2026-10-20 | `mypy src` after Phase 2 | PASS ("no issues found in 31 source files") |
+| 2026-10-20 | `python -m build` after Phase 2 | PASS (wheel + sdist) |
+| 2026-10-20 | Excel ingest end-to-end (openpyxl writer + fastexcel reader) | PASS (leading zeros preserved, lineage `source_sheet`/`source_row` attached) |
+| 2026-10-20 | pandas<->polars interop (`[pandas]` extra) | PASS (roundtrip, no caller mutation) |
 | | *(later phases append: pytest run IDs, coverage %, ruff/mypy outputs, build logs, benchmark numbers with machine details)* | |
 
 ---

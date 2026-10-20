@@ -15,18 +15,23 @@ historical events from a single snapshot.
 
 ## Status
 
-**Early development (Phase 1 complete).** Currently available:
+**Early development (Phases 0–2 complete).** Currently available:
 
 - Strict versioned configuration (`RosterConfig`) with grain, date, policy,
   input-mapping, and rule-override sections.
 - Canonical domain schemas (employee, territory, assignment, event, coverage).
 - Half-open interval and effective-date primitives.
 - Registry of all 86 validation rule specifications (`rosterops rules list`).
+- **Input ingestion**: CSV/Parquet (always) and Excel (optional `[excel]`)
+  readers with format detection, source→canonical column mapping, aliases, null
+  tokens, per-field date formats, categorical checks, trim policy, and per-row
+  lineage — Group A rules (`ING-*`, `SCH-*`) implemented.
+- Optional pandas interop (`[pandas]`): convert caller DataFrames to/from Polars.
 - CLI scaffold: `--version`, `rules list`, `rules describe`, `validate-inputs`
   (configuration check only).
 
-Not yet implemented: file ingestion, reconstruction, rule execution, metrics,
-reports, and the `process`/`validate` commands. See
+Not yet implemented: event normalization, reconstruction, full rule execution,
+metrics, reports, and the `process`/`validate` commands. See
 [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) for the full tracker
 and [`REQUIREMENTS.md`](REQUIREMENTS.md) for the operative specification.
 
@@ -35,6 +40,7 @@ and [`REQUIREMENTS.md`](REQUIREMENTS.md) for the operative specification.
 ```bash
 pip install -e ".[dev]"          # development
 pip install -e ".[excel]"        # with Excel read/write support
+pip install -e ".[pandas]"       # with pandas interop
 ```
 
 Requires Python 3.10+. Core dependencies: `polars`, `pydantic`, `PyYAML`.
