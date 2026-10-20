@@ -318,6 +318,18 @@ def _apply_leave_start(ctx: EngineContext, event: Event, eid: str, known: set[st
         )
         return
     end = event.leave_end_date
+    end = event.leave_end_date
+    employment_start = _employment_start(ctx, eid)
+    if employment_start is not None and start < employment_start:
+        ctx.emit(
+            L.LOA_001,
+            f"leave for {eid!r} starts {start} before employment start {employment_start}",
+            employee_id=eid,
+            event_id=event.event_id,
+            effective_date=start,
+            actual_value=f"{start}",
+            expected_value=f">={employment_start}",
+        )
     if end is not None and end < start:
         ctx.emit(
             L.LOA_001,
@@ -487,6 +499,11 @@ def _before(day: date) -> date:
     from datetime import timedelta
 
     return day - timedelta(days=1)
+
+
+def _employment_start(ctx: EngineContext, eid: str) -> date | None:
+    starts = [ep.start for ep in ctx.state.employment.get(eid, []) if ep.start is not None]
+    return min(starts) if starts else None
 
 
 def _known_territories(ctx: EngineContext) -> set[str] | None:

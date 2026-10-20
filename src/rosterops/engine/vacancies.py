@@ -48,6 +48,25 @@ def compute_vacancies(
         return pl.DataFrame(schema={c: pl.String for c in VACANCY_COLUMNS})
 
     event_kinds = event_kinds or {}
+
+    # Precompute occupancy once: the set of territories with an active primary
+    # at as_of, and the latest prior primary end per territory. Both are built
+    # in O(total assignments) rather than rescanning every employee per
+    # territory.
+    occupied: set[str] = set()
+    latest_end: dict[str, date] = {}
+    for employee_id in state.employee_ids():
+        for assignment in state.active_assignments(employee_id, as_of):
+            if assignment.is_primary and assignment.territory_id:
+                occupied.add(assignment.territory_id)
+        for assignment in state.assignments.get(employee_id, []):
+            territory_id = assignment.territory_id
+            if not assignment.is_primary or not territory_id or assignment.end is None:
+                continue
+            prior = latest_end.get(territory_id)
+            if prior is None or assignment.end > prior:
+                latest_end[territory_id] = assignment.end
+
     rows: list[dict[str, object]] = []
     for row in territories.iter_rows(named=True):
         territory_id = _s(row.get("territory_id"))
@@ -57,14 +76,10 @@ def compute_vacancies(
         status = (_s(row.get("territory_status")) or "").lower()
         inactive = status not in {"", "active"}
 
-        occupied = any(
-            a.territory_id == territory_id and a.is_primary
-            for eid in state.employee_ids()
-            for a in state.active_assignments(eid, as_of)
-        )
+        is_occupied = territory_id in occupied
 
         if inactive or not requires:
-            if not occupied:
+            if not is_occupied:
                 rows.append(
                     _entry(
                         territory_id,
@@ -74,10 +89,18 @@ def compute_vacancies(
                     )
                 )
             continue
-        if occupied:
+        if is_occupied:
             continue
         kind = event_kinds.get(territory_id, "permanently_unassigned")
-        rows.append(_entry(territory_id, kind, as_of, "no active primary owner"))
+        rows.append(
+            _entry(
+                territory_id,
+                kind,
+                as_of,
+                "no active primary owner",
+                start=latest_end.get(territory_id),
+            )
+        )
 
     if not rows:
         return pl.DataFrame(schema={c: pl.String for c in VACANCY_COLUMNS})
@@ -85,11 +108,18 @@ def compute_vacancies(
     return frame.select(list(VACANCY_COLUMNS)).sort("territory_id")
 
 
-def _entry(territory_id: str, kind: str, as_of: date, detail: str) -> dict[str, object]:
+def _entry(
+    territory_id: str,
+    kind: str,
+    as_of: date,
+    detail: str,
+    *,
+    start: date | None = None,
+) -> dict[str, object]:
     return {
         "territory_id": territory_id,
         "vacancy_kind": kind,
-        "vacancy_start": as_of,
+        "vacancy_start": start if start is not None else as_of,
         "vacancy_end": None,
         "as_of": as_of,
         "detail": detail,

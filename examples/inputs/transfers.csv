@@ -1,0 +1,2 @@
+event_id,employee_id,effective_date,from_territory_id,to_territory_id
+TR001,E001,2026-10-01,T100,T400

@@ -1,0 +1,72 @@
+# rosterops §10 example scenario — ILLUSTRATIVE ONLY.
+#
+# A runnable example: a 4-employee field organization with one transfer, one
+# promotion, one leave/return pair, and one termination in October 2026.
+#
+# Run it with:
+#   rosterops process \
+#     --config examples/config/scenario.yaml \
+#     --baseline examples/inputs/baseline.csv \
+#     --baseline-date 2026-09-30 \
+#     --as-of 2026-10-31 \
+#     --transfers examples/inputs/transfers.csv \
+#     --promotions examples/inputs/promotions.csv \
+#     --leaves examples/inputs/leaves.csv \
+#     --returns examples/inputs/returns.csv \
+#     --terminations examples/inputs/terminations.csv \
+#     --territories examples/inputs/territories.csv \
+#     --output-dir out --overwrite
+
+version: 1
+
+data:
+  grain: employee_territory
+
+dates:
+  interval_convention: half_open
+  baseline_includes_effective_date: true
+  default_date_format: "%Y-%m-%d"
+  termination_date_semantics: last_working_day_inclusive
+
+policies:
+  allow_multiple_active_territories: true
+  max_primary_territories_per_employee: 1
+  require_active_manager: false
+  allow_unassigned_active_employees: true
+
+  leave:
+    retains_employment_status: true
+    retains_home_assignment: true
+    coverage_required_by_default: false
+    allow_overlapping_leave_types: false
+
+  vacancy:
+    derive_only_for_required_owner_territories: true
+    count_leave_as_vacancy: false
+
+  events:
+    reject_events_on_or_before_baseline_date: true
+    resolve_conflicting_same_date_events: false
+
+# The inputs use canonical column names, so no per-role mapping is required;
+# every role below is supplied on the command line.
+inputs:
+  baseline:
+    required: true
+  transfers:
+    required: false
+  promotions:
+    required: false
+  terminations:
+    required: false
+  leaves:
+    required: false
+  returns:
+    required: false
+  territories:
+    required: false
+
+outputs:
+  formats: [csv, parquet, json]
+  excel_row_cap: 50000
+  fail_on_warning: false

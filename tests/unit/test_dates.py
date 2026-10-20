@@ -23,7 +23,11 @@ D = date
         ("  2026-10-31  ", D(2026, 10, 31)),
         ("", None),
         ("   ", None),
-        ("31/10/2026", None),
+        ("31/10/2026", D(2026, 10, 31)),
+        ("2026/10/31", D(2026, 10, 31)),
+        ("31.10.2026", D(2026, 10, 31)),
+        ("20261031", D(2026, 10, 31)),
+        ("31 Oct 2026", D(2026, 10, 31)),
         ("2026-13-45", None),
         ("not-a-date", None),
         (None, None),
@@ -43,7 +47,7 @@ def test_parse_date_format_order_and_custom_formats() -> None:
     assert parse_date("05/10/2026", formats) == D(2026, 10, 5)
     # First matching format wins.
     assert parse_date("2026-10-05", formats) == D(2026, 10, 5)
-    assert DEFAULT_DATE_FORMATS == ("%Y-%m-%d",)
+    assert DEFAULT_DATE_FORMATS[0] == "%Y-%m-%d"
 
 
 def test_parse_date_offset_timezone_converted_to_utc() -> None:

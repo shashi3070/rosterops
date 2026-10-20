@@ -1,0 +1,6 @@
+territory_id,territory_name,region_id,territory_status,requires_primary_owner,max_assignees
+T100,North,REG1,active,true,1
+T200,South,REG1,active,true,1
+T300,East,REG1,active,true,1
+T400,West,REG1,active,true,1
+T900,Head Office,REG0,active,false,2

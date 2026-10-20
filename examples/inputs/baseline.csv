@@ -1,0 +1,5 @@
+employee_id,employee_status,role_code,territory_id,assignment_type,is_primary,effective_from,employment_start_date,manager_id
+E001,Active,REP,T100,primary,true,2024-01-01,2020-01-01,M001
+E002,Active,REP,T200,primary,true,2024-01-01,2020-01-01,M001
+E003,Active,REP,T300,primary,true,2024-01-01,2020-01-01,M001
+M001,Active,MANAGER,T900,primary,true,2024-01-01,2018-01-01,

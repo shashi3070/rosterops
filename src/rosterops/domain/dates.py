@@ -1,7 +1,8 @@
 """Date parsing and effective-date semantics.
 
-Covers scalar date parsing under configured formats, termination-date
-semantics conversion (``DAT-008`` territory), and reconstruction-window
+Covers scalar date parsing under configured formats (ISO-8601 plus common
+day-first, month-first, dotted, compact, and month-name formats), termination-
+date semantics conversion (``DAT-008`` territory), and reconstruction-window
 filtering of events relative to the baseline cutoff.
 """
 
@@ -19,7 +20,19 @@ __all__ = [
     "parse_date",
 ]
 
-DEFAULT_DATE_FORMATS: tuple[str, ...] = ("%Y-%m-%d",)
+DEFAULT_DATE_FORMATS: tuple[str, ...] = (
+    "%Y-%m-%d",
+    "%Y/%m/%d",
+    "%d/%m/%Y",
+    "%m/%d/%Y",
+    "%d-%m-%Y",
+    "%Y%m%d",
+    "%d.%m.%Y",
+    "%d %b %Y",
+    "%d %B %Y",
+    "%b %d, %Y",
+    "%B %d, %Y",
+)
 
 
 def parse_date(value: object, formats: tuple[str, ...] | list[str] | None = None) -> date | None:
