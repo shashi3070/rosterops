@@ -13,6 +13,8 @@ It is a local-first data-processing library and CLI. It never writes back to a
 CRM, HR system, or database, requires no network access, and never fabricates
 historical events from a single snapshot.
 
+![rosterops architecture and workflow](https://raw.githubusercontent.com/shashi3070/rosterops/main/docs/rosterops-architecture.png)
+
 ## Status
 
 **Beta (Phases 0–8 complete).** `process` and `validate` commands are

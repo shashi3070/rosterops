@@ -58,6 +58,9 @@ path = "src/rosterops/version.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/rosterops"]
 
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "README.md", "LICENSE", "pyproject.toml"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

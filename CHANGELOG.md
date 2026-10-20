@@ -58,3 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`rosterops process`, `rosterops validate`) with documented exit codes.
 - Optional pandas interop (`[pandas]` extra): `to_polars`/`to_pandas` without
   mutating caller frames (decision D11).
+- Architecture and workflow infographic embedded in the README
+  (`docs/rosterops-architecture.png`), shipped in the sdist.
+
+### Changed
+
+- Same-date conflicting events are now blocked by default: each involved event
+  is marked `EventStatus.CONFLICTED` with an exclusion reason, so conflicting
+  movements never mutate reconstructed state until explicitly resolved.
