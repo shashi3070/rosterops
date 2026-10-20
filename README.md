@@ -15,28 +15,10 @@ historical events from a single snapshot.
 
 ## Status
 
-**Early development (Phases 0–3 complete).** Currently available:
-
-- Strict versioned configuration (`RosterConfig`) with grain, date, policy,
-  input-mapping, and rule-override sections.
-- Canonical domain schemas (employee, territory, assignment, event, coverage).
-- Half-open interval and effective-date primitives.
-- Registry of all 86 validation rule specifications (`rosterops rules list`).
-- **Input ingestion**: CSV/Parquet (always) and Excel (optional `[excel]`)
-  readers with format detection, source→canonical column mapping, aliases, null
-  tokens, per-field date formats, categorical checks, trim policy, and per-row
-  lineage — Group A rules (`ING-*`, `SCH-*`) implemented.
-- **Canonical event ledger**: all eight event types (transfer, promotion,
-  termination, leave start/return, hire, rehire, temp coverage) normalized with
-  namespaced identity, content fingerprints (cross-file dedupe `ID-007`),
-  baseline cutoff (`DAT-006`), same-date conflict detection (`DAT-007`), and
-  auditable termination-semantics conversion (`DAT-008`).
-- Optional pandas interop (`[pandas]`): convert caller DataFrames to/from Polars.
-- CLI scaffold: `--version`, `rules list`, `rules describe`, `validate-inputs`
-  (configuration check only).
-
-Not yet implemented: reconstruction, full rule execution, metrics, reports, and
-the `process`/`validate` commands. See
+**Beta (Phases 0–8 complete).** `process` and `validate` commands are
+implemented (Modes A/B), rules execute end-to-end, outputs include CSV/Parquet/JSON
+and `rosterops_report.xlsx`, reconciliation and movement metrics are computed,
+and the example scenario runs. See
 [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) for the full tracker
 and [`REQUIREMENTS.md`](REQUIREMENTS.md) for the operative specification.
 
@@ -57,13 +39,13 @@ rosterops --help
 rosterops --version
 rosterops rules list
 rosterops rules describe TRF-002
-rosterops validate-inputs --config examples/config/generic_pharma.yaml
+rosterops validate-inputs --config examples/config/scenario.yaml
 ```
 
 ```python
 from rosterops import RosterConfig
 
-config = RosterConfig.from_file("examples/config/generic_pharma.yaml")
+config = RosterConfig.from_file("examples/config/scenario.yaml")
 print(config.data.grain)
 ```
 
